@@ -7,7 +7,7 @@ const addToken = async (token) => ddb.put({
   TableName: process.env.TOKENS_TABLE_NAME,
   Item: {
     tokenId: token,
-    timestamp: '0',
+    timestamp: '$ORIGINAL',
   },
 }).promise();
 
@@ -15,7 +15,7 @@ const addTokenList = async (tokenList) => Promise.all(
   tokenList.map((token) => addToken(token)),
 );
 
-const deleteTokenTimestamp = async (tokenId, timestamps) => Promise.all(
+const deleteTokenWithTimestamp = async (tokenId, timestamps) => Promise.all(
   timestamps.map((timestamp) => ddb.delete({
     TableName: process.env.TOKENS_TABLE_NAME,
     Key: {
@@ -27,8 +27,7 @@ const deleteTokenTimestamp = async (tokenId, timestamps) => Promise.all(
 
 const deleteToken = async (token) => {
   const sortKeys = await getTokenSortKeys(token);
-  console.log(token, sortKeys);
-  return deleteTokenTimestamp(token, sortKeys);
+  return deleteTokenWithTimestamp(token, sortKeys);
 };
 
-module.exports = { addToken, addTokenList, deleteToken };
+module.exports = { addToken, addTokenList, deleteTokenById: deleteToken };

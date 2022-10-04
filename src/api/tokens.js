@@ -1,7 +1,8 @@
-const { addTokenList, deleteToken } = require('../common/writers');
+const { addTokenList, deleteTokenById } = require('../common/writers');
 const { generateResponse } = require('../common/utils');
+const { getLastTokenTimestamp, getTokenPrimaryKeys } = require('../common/readers');
 
-const deleteTokens = async (event) => {
+const deleteToken = async (event) => {
   const { id } = event.pathParameters;
 
   if (!id) {
@@ -13,7 +14,7 @@ const deleteTokens = async (event) => {
     });
   }
 
-  await deleteToken(id);
+  await deleteTokenById(id);
 
   return generateResponse({
     statusCode: 200,
@@ -44,4 +45,42 @@ const postTokens = async (event) => {
   });
 };
 
-module.exports = { postTokens, deleteTokens };
+const getToken = async (event) => {
+  const { id } = event.pathParameters;
+
+  if (!id) {
+    return generateResponse({
+      statusCode: 400,
+      body: {
+        message: 'Missing id parameter',
+      },
+    });
+  }
+
+  const lastToken = await getLastTokenTimestamp(id);
+
+  return generateResponse({
+    statusCode: 200,
+    body: {
+      token: lastToken,
+    },
+  });
+};
+
+const getTokens = async () => {
+  const tokenNames = await getTokenPrimaryKeys();
+  const allTokens = await Promise.all(
+    tokenNames.map(async (tokenId) => getLastTokenTimestamp(tokenId)),
+  );
+
+  return generateResponse({
+    statusCode: 200,
+    body: {
+      tokens: allTokens,
+    },
+  });
+};
+
+module.exports = {
+  postTokens, deleteToken, getToken, getTokens,
+};
