@@ -1,16 +1,25 @@
 service: crypto-scraper
 frameworkVersion: '3'
 
+useDotenv: true
+
+plugins:
+  - serverless-iam-roles-per-function
+
 custom:
   tableName: 'cs-tokensTable-${opt:stage}'
+  scraperName: 'cs-scraper-${opt:stage}'
 
 provider:
   name: aws
   runtime: nodejs16.x
   stage: dev
-  region: "${env:region, 'us-west-2'}"
+  region: "${env:region, env:REGION, 'us-west-2'}"
   environment:
     TOKENS_TABLE_NAME: '${self:custom.tableName}'
+    SCRAPER_FUNCTION_NAME: '${self:custom.scraperName}'
+    REGION: ${env:region, env:REGION, 'us-west-2'}
+
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -19,19 +28,27 @@ provider:
         - dynamodb:GetItem
         - dynamodb:PutItem
         - dynamodb:DeleteItem
-      Resource: { "Fn::GetAtt": ["TokensDynamoDbTable", "Arn"] }
+      Resource: !GetAtt TokensDynamoDbTable.Arn
 
 functions:
   post_tokens:
     name: 'cs-post-tokens-${opt:stage}'
     handler: src/api/tokens.postTokens
+    iamRoleStatementsInherit: true
     events:
       - http:
           path: /tokens
           method: POST
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "lambda:InvokeFunction"
+          - "lambda:InvokeAsync"
+        Resource: !GetAtt ScraperLambdaFunction.Arn
   get_tokens:
     name: 'cs-get-tokens-${opt:stage}'
     handler: src/api/tokens.getTokens
+    iamRoleStatementsInherit: true
     events:
       - http:
           path: /tokens
@@ -39,6 +56,7 @@ functions:
   delete_token:
     name: 'cs-delete-token-${opt:stage}'
     handler: src/api/tokens.deleteToken
+    iamRoleStatementsInherit: true
     events:
       - http:
           path: /tokens/{id}
@@ -50,6 +68,7 @@ functions:
   get_token:
     name: 'cs-get-token-${opt:stage}'
     handler: src/api/tokens.getToken
+    iamRoleStatementsInherit: true
     events:
       - http:
           path: /tokens/{id}
@@ -58,6 +77,16 @@ functions:
             parameters:
               paths:
                 id: true
+  scraper:
+    name: '${self:custom.scraperName}'
+    handler: src/lambda-functions/scraper.main
+    iamRoleStatementsInherit: true
+    events:
+      - schedule: rate(${env:SCRAP_DELAY, 30} minutes)
+    environment:
+      # Here secrets can be used for production see https://www.serverless.com/blog/aws-secrets-management/
+      COINLAYER_ACCESS_KEY: '${env:COINLAYER_ACCESS_KEY}'
+      COINLAYER_ENDPOINT: '${env:COINLAYER_ENDPOINT}'
 
 resources:
   Resources:

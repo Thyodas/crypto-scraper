@@ -33,14 +33,13 @@ const getTokenPrimaryKeys = async () => {
 const getLastTokenTimestamp = async (tokenId, limit = 1) => {
   const param = {
     TableName: process.env.TOKENS_TABLE_NAME,
-    Limit: limit,
     ScanIndexForward: false,
     KeyConditionExpression: 'tokenId = :token',
     ExpressionAttributeValues: {
       ':token': tokenId,
     },
   };
-  return (await dbFullQuery(ddb, param))[0];
+  return (await dbFullQuery(ddb, param)).filter((token) => token.timestamp !== '$ORIGINAL').slice(0, limit);
 };
 
 module.exports = { getTokenSortKeys, getTokenPrimaryKeys, getLastTokenTimestamp };
